@@ -10,3 +10,4 @@ Type "copyright", "credits" or "license()" for more information.
     
 IDLE 2.6.6      
 >>> print ("hello")
+>>> print ("hello")
