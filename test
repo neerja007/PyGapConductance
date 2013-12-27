@@ -1,0 +1,3 @@
+import cantera as ct
+gas1=ct.Soultuion('gri30.xml')
+gas()
