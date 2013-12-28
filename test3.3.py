@@ -1,3 +1,3 @@
 import cantera as ct
-gas1 = ct.Argon
-gas1()
+g = ct.Transport('gri30.xml')
+print(g.viscosity)
