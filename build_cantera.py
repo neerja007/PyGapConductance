@@ -1,0 +1,399 @@
+#!/usr/bin/env python
+# encoding: utf-8
+#
+# A script to build a Cantera installation on *ix systems
+# Cantera-2.x version
+#
+# Copyright (c) 2012, Phillip Berndt
+# All rights reserved.
+# Redistribution in source and binary forms permitted under the terms of the
+# FreeBSD licence.
+#
+import tempfile
+import re
+import urllib
+import os
+import termios
+import sys
+import tty
+
+try:
+	import readline
+except:
+	try:
+		import libedit
+	except:
+		pass
+
+welcome_message = """\033[4;1mCANTERA INSTALL SCRIPT\033[0m
+
+Welcome to the cantera installation script. This script will
+download the latest Cantera 2.x from the google code homepage at
+	<http://code.google.com/p/cantera/>
+or from the subversion repository and build it for your system,
+along with all common prerequisites. 
+
+You should in advance install all the prerequisites from
+	<http://cantera.github.com/docs/sphinx/html/compiling.html>
+except for sundials, which we will download and install for you.
+
+"""
+
+script_template = """
+export PS1="[CANTERA] $PS1"
+VIRTUAL_ENV="{dest}"
+export VIRTUAL_ENV
+PATH="{dest}/bin:$PATH"
+export PATH
+unset PYTHONHOME
+LD_LIBRARY_PATH={dest}/lib:$LD_LIBRARY_PATH
+export LD_LIBRARY_PATH
+PYTHON_CMD=/usr/bin/python
+export PYTHON_CMD
+MATLABPATH=$MATLABPATH:{dest}/lib/cantera/matlab/toolbox:{dest}/lib/cantera/matlab/toolbox/1D:{dest}/share/matlab/toolbox
+export MATLABPATH
+PYTHONPATH=`echo {dest}/lib/python2.?/site-packages`:$PYTHONPATH
+export PYTHONPATH
+export MATLAB_MEM_MGR=compact
+export LD_PRELOAD={stdcpplib}
+export CANTERA_XML_DIR={dest}/share/cantera/xml
+export PKG_CONFIG_PATH={dest}/lib/pkgconfig
+"""
+
+def ld_search(library):
+	if os.environ["LD_LIBRARY_PATH"]:
+		for path in os.environ["LD_LIBRARY_PATH"].split(":"):
+			if os.path.isdir(path):
+				joinedPath = os.path.join(path, library)
+				if(os.access(joinedPath, os.F_OK)):
+					return joinedPath
+	if os.access("/etc/ld.so.cache", os.R_OK):
+		libs = open("/etc/ld.so.cache").read().split("\0")
+		try:
+			return libs[libs.index(library) + 1]
+		except:
+			pass
+	return ""
+
+def compile_test(code, flags=None):
+	tempFile = tempfile.mktemp(".c")
+	executable = tempfile.mktemp(".exe")
+	tempFileObject = open(tempFile, "w")
+	tempFileObject.write(code)
+	tempFileObject.close()
+	retval = os.system("cc -o %s %s %s >/dev/null 2>&1" % (executable, flags or "", tempFile)) != 0 or os.system(executable + " >/dev/null 2>&1") != 0
+	try:
+		os.unlink(tempFile)
+		os.unlink(executable)
+	except:
+		pass
+	return not retval
+
+def urlretrieve_callback(chunks, chunk_size, total_size):
+	downloaded = chunks * chunk_size
+	per20 = downloaded * 20 / total_size
+	progress = "\033[2K[" + ("-" * per20) + (" " * (20 - per20)) + ("] %02d%% (%02.2f of %02.2f Mb)" % (per20 * 5, downloaded / 1024**2, total_size / 1024**2)) + "\r"
+	sys.stdout.write(progress)
+	sys.stdout.flush()
+
+def read_yes_no():
+	fileno = sys.stdin.fileno()
+	old = termios.tcgetattr(fileno)
+	yes_no = ""
+	try:
+		tty.setraw(fileno)
+		while yes_no not in ("y", "n"):
+			yes_no = sys.stdin.read(1).lower()
+	finally:
+		termios.tcsetattr(fileno, termios.TCSADRAIN, old)
+	return yes_no == "y"
+
+def update_config(config, setting, value):
+	for line in range(len(config)):
+		if config[line][:len(setting)] == setting:
+			config[line] = setting + "='" + value + "'\n"
+	return config
+
+def main():
+	print welcome_message
+
+	# Query installation target
+	if len(sys.argv) > 1:
+		dest = sys.argv[1].strip()
+		print "\033[32mAssuming\033[0m %s \033[32mis the installation directory\033[0m" % dest
+		if not os.path.isdir(dest):
+			try:
+				os.mkdir(dest)
+			except:
+				print "\033[31mFailed to create the directory\033[0m", dest
+	else:
+		default = os.popen("pkg-config --variable=prefix cantera 2>/dev/null").read().strip()
+		if not default:
+			default = "~/Cantera"
+		while True:
+			print "\033[33mWhere do you want to install Cantera? [default: %s]\033[0m" % default
+			dest = raw_input().strip()
+			if dest == "":
+				dest = default
+			dest = os.path.abspath(os.path.expanduser(dest))
+			if not os.path.isdir(dest):
+				try:
+					os.mkdir(dest)
+					break
+				except:
+					print "\033[31mFailed to create the directory\033[0m", dest
+			else:
+				break
+	os.chdir(dest)
+	if not os.path.isdir("build"):
+		os.mkdir("build")
+	os.chdir("build")
+
+	# Check other build requisites
+	print "\033[32mChecking for required programs..\033[0m"
+	apps = ("gcc", "g++", )
+	for app in apps:
+		if os.system("which %s > /dev/null 2>&1" % app) != 0:
+			print "\033[31mCould not find `%s' executable. Please install it using your package manager.\033[0m"
+			sys.exit(0)
+	
+	# Check mex
+	print "\033[32mSearching for a matlab installation..\033[0m"
+	matlab_root = os.popen('echo "exit" | matlab -nojvm -nodesktop -r matlabroot | grep -E "^/" | tail -n1').read().strip()
+	if os.path.isdir(matlab_root):
+		print "\033[32mAutodetermining if mex is properly set up\033[0m"
+		mex_installed = os.access(os.path.join(matlab_root, "bin/gccopts.sh"), os.R_OK) or os.access(os.path.join(matlab_root, "bin/mexopts.sh"), os.R_OK)
+		if not mex_installed:
+			print
+			print "\033[33mMex is NOT properly set up. User interaction required.\033[0m"
+	else:
+		print "\033[33mMatlab not found.\nDo you have Matlab and did you already execute `mex -setup' once? [yn]\033[0m"
+		mex_installed = read_yes_no()
+	no_matlab = False
+	if not mex_installed:
+		print "\033[32mExecuting `mex -setup'\033[0m"
+		if not os.system(os.path.join(matlab_root, "bin/mex") + " -setup"):
+			print "Command failed! Do you have Matlab installed? NOT BUILDING MATLAB INTERFACE!"
+			no_matlab = True
+
+	# Setup virtualenv
+	if os.access(os.path.join(dest, "bin/python"), os.F_OK):
+		print "\033[32mFound local Python installation in destination. No virtualenv required.\033[0m"
+	else:
+		print "\033[32mDownloading a copy of virtualenv.. \033[0m"
+		urllib.urlretrieve("https://raw.github.com/pypa/virtualenv/master/virtualenv.py", "virtualenv.py", urlretrieve_callback)
+		print "\nok"
+		print "\033[32mSetting up virtualenv for", dest, ".. \033[0m"
+		os.system("virtualenv ../")
+	os.environ["VIRTUAL_ENV"] = dest
+	os.environ["PYTHON_CMD"] = os.path.join(dest, "bin/python")
+	os.environ["PATH"] = os.path.join(dest, "bin/") + ":" +  os.environ["PATH"]
+	if "PYTHONHOME" in os.environ:
+		del os.environ["PYTHONHOME"]
+
+	# Check for numpy
+	has_numpy = os.system(repr(os.environ["PYTHON_CMD"]) + " -c 'import numpy' 2>/dev/null") == 0
+	if has_numpy:
+		print "\033[32mnumpy is already installed, skipping installation\033[0m"
+	else:
+		print "\033[32mInstalling numpy.. \033[0m"
+		if os.system("pip install numpy") != 0:
+			print "\033[31mError\033[0m"
+			sys.exit(1)
+	
+	# Check for scons WITHIN THE PREFIX
+	if os.system("which scons >/dev/null") == 0:
+		print "\033[32mscons is already installed, skipping installation\033[0m"
+	else:
+		print "\033[32mInstalling scons.. \033[0m"
+		if os.system("pip install scons") != 0:
+			# pip can not install scons because of a silly --single-version-externally-managed error
+			print "\033[32mError while installing scons. THIS IS PROBABLY NORMAL and a bug in pip/scons. Trying to fix this manually..\033[0m"
+			os.chdir("scons")
+			if os.system("python setup.py install") != 0:
+				print "\033[31mError\033[0m. Nope. This is a real error."
+				sys.exit(1)
+			os.chdir("..")
+
+	# Download & build Sundials
+	# This can be problematic on 64-bit systems with the Python interface
+	sundials_version = "2.5.0"
+	has_cvode = compile_test("""
+		#include <cvode/cvode.h>
+		#include <ida/ida.h>
+
+		int main(int argc, char *argv[]) {
+			return 0;
+		}
+	""")
+	if has_cvode:
+		print "\033[32mSystemwide Sundials already found. Skipping build..\033[0m"
+	elif os.access(os.path.join(dest, "lib/libsundials_cvode.a"), os.F_OK):
+		print "\033[32mSundials already found in destination. Skipping build..\033[0m"
+	else:
+		print "\033[32mDownloading and installing Sundials.. \033[0m"
+		urllib.urlretrieve("https://computation.llnl.gov/casc/sundials/download/code/sundials-" + sundials_version + ".tar.gz", "sundials.tar.gz", urlretrieve_callback)
+		print "\n"
+		os.system("tar xzf sundials.tar.gz")
+		os.chdir("sundials-" + sundials_version)
+		old_cflags = "" if "CFLAGS" not in os.environ else os.environ["CFLAGS"]
+		# -fPIC is required for 64bit systems
+		os.environ["CFLAGS"] = "-O3 -fPIC -Wall " + old_cflags
+		if os.system("./configure --prefix=\"%s\" --disable-idas --disable-kinsol --disable-cpodes && make && make install" % dest) != 0:
+			print "\033[31mError\033[0m"
+			sys.exit(1)
+		if old_cflags:
+			os.environ["CFLAGS"] = old_cflags
+		else:
+			del os.environ["CFLAGS"]
+		os.chdir("..")
+		
+	# Download Cantera
+	present = [ x for x in os.listdir(".") if "cantera-2." in x and os.path.isdir(x) ]
+	if present:
+		print "\033[32mCantera " + present[0] + " already present. Using that version..\033[0m"
+		os.chdir(present[0])
+		if os.path.isdir(".svn") and "-trunk" in present[0]:
+			print "\033[32mUpdating to latest trunk..\033[0m"
+			if os.system("svn up") != 0:
+				print "\033[31mError\033[0m: Failed to update Cantera\033[0m"
+				sys.exit(1)
+	else:
+		print "\033[33mDo you want the latest stable (y) or trunk (n) version?\033[0m"
+		if read_yes_no():
+			print "\033[32mDownloading Cantera from the homepage.. \033[0m"
+			page = urllib.urlopen("http://code.google.com/p/cantera/downloads/list").read()
+			version = re.search(r"(cantera-2\.[0-9.]+)\.tar\.gz", page)
+			if not version:
+				print "\033[31mError[\0330m: Failed to find Cantera download on homepage"
+				sys.exit(1)
+			print " Version: " + version.group(1)
+			urllib.urlretrieve("http://cantera.googlecode.com/files/" + version.group(0), "cantera.tar.gz", urlretrieve_callback)
+			print "\n"
+			if os.system("tar xzf cantera.tar.gz") != 0:
+				print "\033[31mError\033[0m: Failed to unpack Cantera"
+				sys.exit(1)
+			os.chdir(version.group(1))
+		else:
+			print "\033[32mDownloading Cantera from the subversion repository.. \033[0m"
+			if os.system("svn checkout http://cantera.googlecode.com/svn/cantera/trunk/ cantera-2.x-trunk") != 0:
+				print "\033[31mError\033[0m: Failed to download Cantera"
+				sys.exit(1)
+			os.chdir("cantera-2.x-trunk")
+
+			
+
+	# Check for doxygen
+	if os.system("which doxygen >/dev/null 2>&1") != 0:
+		print "\033[32mDoxygen not found. NOT building documentation.\033[0m"
+		doxygen = "no"
+	else:
+		print "\033[32mDoxygen found. Building documentation\033[0m"
+		doxygen = "yes"
+		# We need to do some adjustments.. at least Debian's latest doxygen version has
+		# problems with the configuration
+		doxyfile = open("doc/doxygen/Doxyfile").read()
+		doxyfile = doxyfile.replace("EXCLUDE_PATTERNS  ", "#EXCLUDE_PATTERNS")
+		doxyfile = doxyfile.replace("LATEX_BATCHMODE  ", "LATEX_BATCHMODE = YES\n# LATEX_BATCHMODE  ")
+		open("doc/doxygen/Doxyfile", "w").write(doxyfile)
+
+	# The configuration file cantera.conf does not work properly when invoked
+	# from a script, so we will put the configuration onto the command line
+	config = " ".join(( a + "='" + b.replace("'", r"\'") + "'" for (a, b) in {
+		"prefix": dest,
+		"python_package": "full",
+		"python_cmd": os.path.join(dest, "bin/python"),
+		"python_array": "numpy",
+		"matlab_toolbox": "y" if not no_matlab else "n",
+		"matlab_path": "" if no_matlab else matlab_root,
+		"doxygen_docs": doxygen,
+		"use_sundials": "y",
+		"python3_package": "n",
+		"sundials_include": os.path.join(dest, "include"),
+		"sundials_libdir": os.path.join(dest, "lib"),
+		"build_thread_safe": "y",
+	}.items()))
+
+	# Configure & build Cantera
+	print "\033[32mBuilding Cantera.. \033[0m"
+	if os.system("scons build " + config) != 0:
+		print "\033[31mError\033[0m"
+		sys.exit(1)
+	print "\033[32mInstalling Cantera.. \033[0m"
+	if os.system("scons install " + config) != 0:
+		print "\033[31mError\033[0m"
+		sys.exit(1)
+
+	os.chdir("../../")
+
+	# Install sd-toolbox
+	python_dirs = [ x for x in os.listdir("lib") if os.path.isdir("lib/" + x) and "python" in x ]
+	python_dir = python_dirs[0]
+	if os.path.isdir("lib/{0}/site-packages/SDToolbox".format(python_dir)):
+		print "\033[32mSD_Toolbox already installed. Skipping..\033[0m"
+	else:
+		print "\033[32mInstalling SD_Toolbox.. \033[0m"
+		os.system("""
+			mkdir -p lib/{0}/site-packages/SDToolbox;
+			cd lib/{0}/site-packages/SDToolbox;
+			wget http://www2.galcit.caltech.edu/EDL/public/cantera/1.7/python/lin/sdt/SDToolbox.tar &&
+			tar xf SDToolbox.tar &&
+			rm -f SDToolbox.tar &&
+			echo "from numpy import *\nfrom numpy.numarray import *" | tee numarray.py Numeric.py
+		""".format(python_dir))
+		os.system("""
+			mkdir -p share/doc/Cantera_SD_Toolbox/demos;
+			cd share/doc/Cantera_SD_Toolbox/demos;
+			wget http://www2.galcit.caltech.edu/EDL/public/cantera/1.7/python/lin/sdt/demos.tar &&
+			tar xf demos.tar &&
+			mv demos/* . && rmdir demos && 
+			rm -f demos.tar &&
+			wget http://www2.galcit.caltech.edu/EDL/public/cantera/mechs/cti/web/h2o2_highT.cti &&
+			wget http://www2.galcit.caltech.edu/EDL/public/cantera/mechs/cti/web/h2air_highT.cti &&
+			wget http://www2.galcit.caltech.edu/EDL/public/cantera/1.7/matlab/win/SDToolbox/demos.zip &&
+			unzip demos.zip &&
+			rm -f demos.zip &&
+			wget http://www2.galcit.caltech.edu/EDL/public/cantera/1.7/matlab/win/SDToolbox/demos_advanced.zip &&
+			unzip demos_advanced.zip &&
+			rm -f demos_advanced.zip
+		""")
+		os.system("""
+			mkdir -p share/matlab/toolbox/ &&
+			cd share/matlab/toolbox &&
+			wget http://www2.galcit.caltech.edu/EDL/public/cantera/1.7/matlab/win/SDToolbox/SDToolbox.zip &&
+			unzip SDToolbox.zip &&
+			rm -f SDToolbox.zip
+		""")
+
+	# There might be other interesting toolboxes to include here!? I don't know of any (yet).
+
+	# Clean up & create run script
+	os.system("""
+			mkdir -p share/doc/Cantera share/cantera/xml; mv share/cantera/doc share/cantera/samples share/doc/Cantera/;
+			rm -f bin/activate bin/activate.csh bin/activate.fish bin/activate_this.py;
+	""")
+	print "\033[33mRemove the temporary files now?\033[0m"
+	if read_yes_no():
+		print "\033[32mCleaning up.. \033[0m"
+		os.system("""
+			rm -rf build
+		""")
+
+	print "\033[32mCreating run script.. \033[0m"
+	setup_env = open("setupenv", "w")
+	print >> setup_env, script_template.format(dest=dest, stdcpplib=ld_search("libstdc++.so.6"))
+	setup_env.close()
+
+	print
+	print "\033[32;1mDone\033[0m"
+	print
+
+	print "Source the script `setupenv' from the installation root to"
+	print "setup your environment for Cantera!"
+	print
+
+if __name__ == '__main__':
+	try:
+		main()
+	except KeyboardInterrupt:
+		print
