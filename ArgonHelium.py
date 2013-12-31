@@ -74,7 +74,7 @@ def cal_domeconductance(rf,ts):
   print('Enter k')
   k = float(input())
   Tc = ts + ((rf)**2*q/(4*k))
-  print Tc 
+  print (Tc) 
 
 
 cal_domeconductance(rf,ts)
