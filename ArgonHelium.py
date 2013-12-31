@@ -13,12 +13,7 @@ rf = float(input())
 ts = float(input())
 q = float(input())
 
-def cal_domeconductance(rf,ts):
 
-  print('Enter k of fuel rod')
-  k = float(input())
-  Tc = ts + (q*(rf)**2)/(4*k))
-  print Tc 
   
 def cal_gapconductance(p1,t1):
 
@@ -71,4 +66,12 @@ def cal_gapconductance(p1,t1):
   print(h)
 
 cal_gapconductance(p1,t1)
-          
+
+def cal_domeconductance(rf,ts):
+
+  print('Enter k of fuel rod')
+  k = float(input())
+  Tc = ts + (q*(rf)**2)/(4*k))
+  print Tc 
+
+cal_domeconductance(rf,ts)          
