@@ -9,17 +9,7 @@ print('Temperature and Pressure obtained from filmdrop : ')
 t1 = float(input())
 p1 = float(input())
 
-print('Enter radius of fuel rod and temperature at the surface and temperature at center of fuel rod');
-rf = float(input())
-ts = float(input())
-tc = float(input())
 
-def cal_domeconductance(rf,ts):
-
-  print('Enter radius at which temperature should be found (Mid point of fuel rod had r = 0)')
-  rp = float(input())
-  T = float( ts + ((tc-ts)*(1-(rp/rf)**2)))
-  print T 
   
 def cal_gapconductance(p1,t1):
 
@@ -72,4 +62,20 @@ def cal_gapconductance(p1,t1):
   print(h)
 
 cal_gapconductance(p1,t1)
+
+
+print('Enter radius of fuel rod and temperature at the surface and heat');
+rf = float(input())
+ts = float(input())
+q = float(input())
+
+def cal_domeconductance(rf,ts):
+
+  print('Enter k')
+  k = float(input())
+  Tc = ts + ((rf)**2*q/(4*k))
+  print Tc 
+
+
+cal_domeconductance(rf,ts)
           
