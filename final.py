@@ -122,8 +122,8 @@ while condition:
 	 arr2[3] = Tcl
 	print('The center line temperature is ', Tcl)
 	j++;
-	for num un range(0,4):
-		if(arr1(num)-arr2(num)<2)||(arr2(num)-arr1(num)<2):
+	for num in range(0,4):
+		if((arr1(num)-arr2(num)<2)||(arr2(num)-arr1(num)<2)):
 		 count++;
 	if count==4:	
 	condition = False
