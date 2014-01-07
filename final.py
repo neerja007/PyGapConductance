@@ -20,6 +20,7 @@ Rf = float(input())
 arr1 = [0,0,0,0]
 arr2 = [0,0,0,0]
 i = 0
+i1 = 0
 j = 1
 #do..loop starts here
 condition = True
@@ -110,11 +111,16 @@ while condition:
 		print("Enter k of fuelrod")
 		k = float(input())
 		Xn = X/((math.pi)*Rf**2)
-		Tcl = Xn/(4*math.pi*k)+Ts
-		#when i > 0
-		#k = (0.042*Ts)+((271*(10**-4)*Ts**2)/2)+((6.9*10**-11)*Ts**3/3)
-		return(Tcl)
-	
+		i1++;
+		if i1 > 0:
+		 k = (0.042*Ts)+((271*(10**-4)*Ts**2)/2)+((6.9*10**-11)*Ts**3/3)
+		Tcl = np.polyld(1.725,0,135.5*10**-4,0.042,(Xn/(4*math.pi))+(0.042+135.5*10**-4+1.725)*Ts)
+		print (Tcl.r)
+		for num1 in range(0,3):
+		 if(Tcl.r(num1)>0):
+		  return(Tcl)
+		 else:
+		 print("Error")6
 	Tcl = fuel_drop(Ts)
 	if(j%2!=0):	
 	 arr1[3] = Tcl
