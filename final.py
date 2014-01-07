@@ -1,9 +1,9 @@
+import cantera as ct
+import math
 print("Enter Helium and Xenon concentration")
 He_conc = float(input())
 Ar_conc = float(input())
 
-import cantera as ct
-import math
 
 print("Enter bulk Temperature of Coolant - Tb(K)")
 Tb = float(input())
