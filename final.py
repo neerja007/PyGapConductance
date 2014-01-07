@@ -30,7 +30,10 @@ while condition:
 		Tco = (X/(2*(math.pi)*Rco*hg))+Tb
 		return(Tco)
 	Tco = film_drop(Tb)
-
+	if(j%2!=0):	
+	 arr1[0] = Tco
+	else:
+	 arr2[0] = Tco
 	def clad_drop(Tco):
 		if i=0:
 		 print("Enter kc of cladding-Stainless steel")
@@ -42,7 +45,10 @@ while condition:
 		 Tci = ((X/(2*math.pi*kcp(Tco)))*2.303*math.log((Rco/Rci)))+Tco	
 		return(Tci)
 	Tci = clad_drop(Tco)
-      	
+      	if(j%2!=0):	
+	 arr1[1] = Tci
+	else:
+	 arr2[1] = Tci
  	
 	def gap_drop(p1,Tci):
 	
@@ -95,7 +101,10 @@ while condition:
   	Ts= (X/(hg*2*math.pi*Rf))+Tci
   	return(Ts)
 	Ts = gap_drop(p1,Tci)
-  
+  	if(j%2!=0):	
+	 arr1[2] = Ts
+	else:
+	 arr2[2] = Ts
 
 	def fuel_drop(Ts):
 		print("Enter k of fuelrod")
@@ -107,4 +116,14 @@ while condition:
 		return(Tcl)
 	
 	Tcl = fuel_drop(Ts)
+	if(j%2!=0):	
+	 arr1[3] = Tcl
+	else:
+	 arr2[3] = Tcl
 	print('The center line temperature is ', Tcl)
+	j++;
+	for num un range(0,4):
+		if(arr1(num)-arr2(num)<2)||(arr2(num)-arr1(num)<2):
+		 count++;
+	if count==4:	
+	condition = False
