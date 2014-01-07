@@ -1,5 +1,6 @@
 import cantera as ct
 import math
+import numpy
 print("Enter Helium and Xenon concentration")
 He_conc = float(input())
 Ar_conc = float(input())
@@ -27,9 +28,14 @@ def film_drop(Tb):
 Tco = film_drop(Tb)
 
 def clad_drop(Tco):
-	print("Enter kc of cladding-Stainless steel")
-	kc = float(input())
-	Tci = ((X/(2*math.pi*kc))*2.303*math.log((Rco/Rci)))+Tco
+	if i=0:
+	 print("Enter kc of cladding-Stainless steel")
+	 kc = float(input())
+	 i++
+	else:
+	 Tci = ((X/(2*math.pi*kc))*2.303*math.log((Rco/Rci)))+Tco
+	 kcp = np.polyld(6.5181*10**-6,-5.105*10**-3,1.428,-4.7127)
+	 Tci = ((X/(2*math.pi*kcp(Tco)))*2.303*math.log((Rco/Rci)))+Tco	
 	return(Tci)
 Tci = clad_drop(Tco)
       
