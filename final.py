@@ -5,34 +5,47 @@ Ar_conc = float(input())
 import cantera as ct
 import math
 
-print('Temperature and Pressure obtained from filmdrop : ')
-t1 = float(input())
-p1 = float(input())
+print("Enter bulk Temperature of Coolant - Tb(K)")
+Tb = float(input())
+print('Enter Pressure in pascals - ')
+p1 = float( input() )
+X = 45000
 
-print('Enter radius of fuel rod and temperature at the surface and temperature at center of fuel rod');
-rf = float(input())
-ts = float(input())
-tc = float(input())
+print("Enter outer radius of cladding,inner radius of cladding,radius of fuelrod")
+Rco = float(input())
+Rci = float(input())
+Rf = float(input())
 
-def cal_domeconductance(rf,ts):
+#loop starts here
+i = 0
+j = 0
+def film_drop(Tb):
+	print("Enter hg of coolant-Na")
+	hg = float(input())
+	Tco = (X/(2*(math.pi)*Rco*hg))+Tb
+	return(Tco)
+Tco = film_drop(Tb)
 
-  print('Enter radius at which temperature should be found (Mid point of fuel rod had r = 0)')
-  rp = float(input())
-  T = float( ts + ((tc-ts)*(1-(rp/rf)**2)))
-  print T 
-  
-def cal_gapconductance(p1,t1):
+def clad_drop(Tco):
+	print("Enter kc of cladding-Stainless steel")
+	kc = float(input())
+	Tci = ((X/(2*math.pi*kc))*2.303*math.log((Rco/Rci)))+Tco
+	return(Tci)
+Tci = clad_drop(Tco)
+      
+ 
+def gap_drop(p1,Tci):
 
   Ar = ct.Solution('Argon.xml')
-  Ar. TP = t1, p1
+  Ar. TP = Tci, p1
   d= float(2*(((Ar.volume_mole/(6.023*10**23))*(3/(4*3.14)))**(1/3)))
-  lamda_Ar=float((.0821*t1)/(math.sqrt(2)*math.pi*d*d*p1*6.023*10**23))
+  lamda_Ar=float((.0821*Tci)/(math.sqrt(2)*math.pi*d*d*p1*6.023*10**23))
 
   He = ct.Solution('Silane.xml')
   He.X = 'HE:1'
-  He. TP = t1, p1
+  He. TP = Tci, p1
   d= float(2*(((He.volume_mole/(6.023*10**23))*(3/(4*3.14)))**(1/3)))
-  lamda_He=float((.0821*t1)/(math.sqrt(2)*math.pi*d*d*p1*6.023*10**23))
+  lamda_He=float((.0821*Tci)/(math.sqrt(2)*math.pi*d*d*p1*6.023*10**23))
 
   #Argon calculation
   k_Ar= float(Ar.thermal_conductivity)
@@ -68,8 +81,20 @@ def cal_gapconductance(p1,t1):
           
   # Assuming surface roughness to be 1
   G = float(G_jump+1)
-  h= (K/G)
-  print(h)
+  hg= (K/G)
+  Ts= (X/(hg*2*math.pi*Rf))+Tci
+  return(Ts)
+Ts = gap_drop(p1,Tci)
+  
 
-cal_gapconductance(p1,t1)
-          
+def fuel_drop(Ts):
+	print("Enter k of fuelrod")
+	k = float(input())
+	Xn = X/((math.pi)*Rf**2)
+	Tcl = Xn/(4*math.pi*k)+Ts
+	#when i > 0
+	#k = (0.042*Ts)+((271*(10**-4)*Ts**2)/2)+((6.9*10**-11)*Ts**3/3)
+	return(Tcl)
+
+Tcl = fuel_drop(Ts)
+print('The center line temperature is ', Tcl)
