@@ -17,10 +17,10 @@ Rco = float(input())
 Rci = float(input())
 Rf = float(input())
 
-arr1 = [0,0,0,0,0]
-arr2 = [0,0,0,0,0]
+arr1 = [0,0,0,0]
+arr2 = [0,0,0,0]
 i = 0
-j = 0
+j = 1
 #do..loop starts here
 condition = True
 while condition:
