@@ -118,7 +118,7 @@ while condition:
 		print (Tcl.r)
 		for num1 in range(0,3):
 		 if(Tcl.r(num1)>0):
-		  return(Tcl)
+		  return(Tcl.r(num1))
 		 else:
 		 print("Error")
 	Tcl = fuel_drop(Ts)
