@@ -120,7 +120,7 @@ while condition:
 		 if(Tcl.r(num1)>0):
 		  return(Tcl)
 		 else:
-		 print("Error")6
+		 print("Error")
 	Tcl = fuel_drop(Ts)
 	if(j%2!=0):	
 	 arr1[3] = Tcl
