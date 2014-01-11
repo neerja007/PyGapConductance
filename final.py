@@ -23,7 +23,7 @@ arr1 = [0,0,0,0]
 arr2 = [0,0,0,0]
 i = 0
 i1 = 0
-j = 1
+j = 0
 He_conc = 0.6
 Ar_conc = 0.4
 Tb = 300
@@ -35,7 +35,6 @@ Rf = 0.003
 condition = True
 while condition:
         def film_drop(Tb):
-                global Tco
                 print("Enter hg of coolant-Na")
                 hg = float(input())
                 Tco = float((X/(2*(math.pi)*Rco*hg))+Tb)
@@ -47,14 +46,16 @@ while condition:
                 arr1[0] = Tco
         else:
                 arr2[0] = Tco
+                
 
         def clad_drop(Tco):
-                kcp = solve ( -4.7127 + 1.428*x - (5.105*10**-3)*(x**2)+ (6.5181*10**-6)*(x**3))
-                for i in range (0,3):
-                        if kcp[i]>0:
-                                k= float(kcp[i])
-                                break
-                Tci= float(((X/(2*math.pi*k(Tco)))*2.303*math.log((Rco/Rci)))+Tco)
+                #kcp = solve ( -4.7127 + 1.428*x - (5.105*10**-3)*(x**2)+ (6.5181*10**-6)*(x**3))
+                kcp = -4.7127 + 1.428*Tco - (5.105*10**-3)*(Tco**2)+ (6.5181*10**-6)*(Tco**3)
+##                for i in range (0,3):
+##                        if kcp[i]>0:
+##                                k= float(kcp[i])
+##                                break
+                Tci= ((X/(2*math.pi*kcp*(Tco)))*2.303*math.log((Rco/Rci)))+Tco
                 return(Tci)#clad inlet temp Tci
 
         Tci = clad_drop(Tco)
@@ -123,14 +124,15 @@ while condition:
                 global i1
                 global count
                 count = 0
-                print("Enter k of fuelrod")
-                k = float(input())
+                #print("Enter k of fuelrod")
+                #k = float(input())
                 Xn = X/((math.pi)*Rf**2)
-                i1 = i1+1
-                if i1 > 0:
-                        k = (0.042*Ts)+((271*(10**-4)*Ts**2)/2)+((6.9*10**-11)*Ts**3/3)
-                Tclarr = solve ( .042*x + 135*(x**2) + 1.725*(x**4)-(.042+.0135+1.725)*Ts-(Xn/4*math.pi))
-                print (Tclarr)
+                #i1 = i1+1
+                #if i1 > 0:
+                k = (0.042*Ts)+((271*(10**-4)*Ts**2)/2)+((6.9*10**-11)*Ts**3/3)
+                print('k of fuel pellet',k)
+                Tclarr = solve ( .042*x + 135*(x**2) + 1.725*(x**4)-(.042+.0135+1.725)*Ts-(Xn/4*math.pi*k))
+                print(Tclarr)
                 for i in range(0,4):
                         if Tclarr[i]>0:
                                 Tcl=Tclarr[i]
@@ -144,8 +146,14 @@ while condition:
                 arr2[3] = Tcl
         print('The center line temperature is ', Tcl)
         j = j+1
+        print(j)
+        print (arr1,arr2)
         for num in range(0,4):
-                if((arr1[num]-arr2[num]<.5) or (arr2[num]-arr1[num]<.5)):
+                print (abs(arr1[num]-arr2[num]))
+                if(abs(arr1[num]-arr2[num])<2):
                         count = count + 1
+        print('the count is',count)
         if count==4:
                 condition = False
+        else:
+                condition = True
