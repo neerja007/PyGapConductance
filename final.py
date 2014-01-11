@@ -1,6 +1,11 @@
 import cantera as ct
 import math
 import numpy as np
+import sympy
+from sympy.solvers import solve
+from sympy import Symbol
+x = Symbol('x') #x is clad temperature Tcl 
+
 ##print("Enter Helium and Xenon concentration")
 ##He_conc = float(input())
 ##Ar_conc = float(input())
@@ -30,9 +35,10 @@ Rf = 0.003
 condition = True
 while condition:
         def film_drop(Tb):
+                global Tco
                 print("Enter hg of coolant-Na")
                 hg = float(input())
-                Tco = (X/(2*(math.pi)*Rco*hg))+Tb
+                Tco = float((X/(2*(math.pi)*Rco*hg))+Tb)
                 return(Tco)
 
         Tco = film_drop(Tb)
@@ -43,9 +49,13 @@ while condition:
                 arr2[0] = Tco
 
         def clad_drop(Tco):
-                kcp = np.poly1d(-5.105*10**-3,1.428,-4.7127)
-                Tci = ((X/(2*math.pi*kcp(Tco)))*2.303*math.log((Rco/Rci)))+Tco
-                return(Tci)
+                kcp = solve ( -4.7127 + 1.428*x - (5.105*10**-3)*(x**2)+ (6.5181*10**-6)*(x**3))
+                for i in range (0,3):
+                        if kcp[i]>0:
+                                k= float(kcp[i])
+                                break
+                Tci= float(((X/(2*math.pi*k(Tco)))*2.303*math.log((Rco/Rci)))+Tco)
+                return(Tci)#clad inlet temp Tci
 
         Tci = clad_drop(Tco)
         print(Tci)
@@ -119,9 +129,12 @@ while condition:
                 i1 = i1+1
                 if i1 > 0:
                         k = (0.042*Ts)+((271*(10**-4)*Ts**2)/2)+((6.9*10**-11)*Ts**3/3)
-                Tclarr = np.poly1d(135.5*10**-4,0.042,(Xn/(4*math.pi))+(0.042+135.5*10**-4+1.725)*Ts)
-                print (Tclarr.r)
-                Tcl = Tclarr(0)
+                Tclarr = solve ( .042*x + 135*(x**2) + 1.725*(x**4)-(.042+.0135+1.725)*Ts-(Xn/4*math.pi))
+                print (Tclarr)
+                for i in range(0,4):
+                        if Tclarr[i]>0:
+                                Tcl=Tclarr[i]
+                                break
                 return (Tcl)
         Tcl = fuel_drop(Ts)
         print(Tcl)
@@ -132,7 +145,7 @@ while condition:
         print('The center line temperature is ', Tcl)
         j = j+1
         for num in range(0,4):
-                if((arr1[num]-arr2[num]<2) or (arr2[num]-arr1[num]<2)):
+                if((arr1[num]-arr2[num]<.5) or (arr2[num]-arr1[num]<.5)):
                         count = count + 1
         if count==4:
                 condition = False
